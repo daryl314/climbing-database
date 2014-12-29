@@ -1,0 +1,55 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <title>Daryl's Sends</title>
+  </head>
+  <body>
+    <link type="text/css" href="sends.css" rel="stylesheet" />
+    <link type="text/css" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/cupertino/jquery-ui.css" rel="stylesheet" />
+    <a href="https://www.evernote.com/pub/daryl314/climbingbeta">Climbing beta</a>
+    <div>
+      <div id="chartContainer" style="width: 100%; height: 400px;"></div>
+      <div id="route_value" class="ui-widget ui-state-default ui-corner-all slider-data" style="left:100px;">5.12a</div>
+      <div id="route_slider" class="slider"></div>
+      <div id="boulder_value" class="ui-widget ui-state-default ui-corner-all slider-data">V6</div>
+      <div id="boulder_slider" class="slider"></div>
+    </div>
+    <div id="routeArea" style="width: 100%; height: 400px;"></div>
+    <div id="boulderArea" style="width: 100%; height: 400px;"></div>
+    <div id="content"'>
+      <div class='container' style='clear:left'>
+        <h1>Best</h1>
+        <div id="best_sends"></div>
+      </div>
+      <div class='container'>
+        <h1>Most Recent</h1>
+        <div id="recent_sends"></div>
+      </div>
+      <table style="width:300px; clear:left;">
+        <tr>
+          <td class='redpoint'>Redpoint</td>
+          <td class='flash'>Flash</td>
+          <td class='onsight'>Onsight</td>
+        </tr>
+      </table>
+      <div class='container' style="clear:left">
+        <h1>Routes</h1>
+        <div id="route_sends"></div>
+      </div>
+      <div class='container'>
+        <h1>Boulder Problems</h1>
+        <div id="boulder_sends" style="float:left"></div>
+      </div>
+      <div class='container' style="clear:left">
+        <h1>Sends by Area</h1>
+        <div id="sends_by_area"></div>
+      </div>
+    </div>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.1/underscore-min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript"> google.load('visualization', '1', {packages: ['corechart']}); </script>
+    <script type="text/javascript" src="/sends.js"></script>
+  </body>
+</html>

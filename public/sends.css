@@ -1,0 +1,18 @@
+body { width: 760px }
+div.entry-content { width: 90% ! important }
+div.slider { float:left; position:relative; top:-50px; width:35% }
+div.slider-data { float:left; position:relative; top:-30px; padding:5px; }
+body { font-size: small; font-family: sans-serif; }
+tr.sends { background-color: #F0F0FF; color: black; }
+td { padding: 2px 5px ! important }
+td.redpoint { background-color: #F0F0FF; color: black; text-align:center;}
+td.onsight { background-color: #FFD0D0; color: black; text-align:center;}
+td.flash { background-color: #E0E0E0; color: black; text-align:center;}
+div.container { float:left; padding:5px; }
+ul.tree, ul.tree ul { list-style-type: none; background: url(vline.png) repeat-y; margin: 0; padding: 0; }
+ul.tree ul{ margin-left:10px; }
+ul.tree li { margin: 0; padding: 0 12px; line-height: 20px; background: url(node.png) no-repeat; }
+ul.tree li:last-child { background: #fff url(lastnode.png) no-repeat; }
+li.area { font-weight: bold; color: blue; }
+li.cliff { font-weight: bold; color: black; }
+li.climb { font-weight: normal; color: black; }

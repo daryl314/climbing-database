@@ -1,0 +1,8 @@
+# ignore climbing database file
+climbing.db
+
+# ignore backups
+/backups/*
+
+# ignore tilde files
+*~

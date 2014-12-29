@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# terminate script on errors
+set -ex
+
+# back up database
+cp climbing.db backups/climbing_`date +%Y-%0m-%0d`.db
