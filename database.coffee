@@ -164,3 +164,10 @@ registerCoffeeHandler = (file) ->
 for file in fs.readdirSync('coffee')
   if file.match /\.coffee$/
     registerCoffeeHandler file
+
+###################
+# OPEN IN BROWSER #
+###################
+
+spawn = require('child_process').spawn
+spawn('xdg-open', ['http://localhost:3000/']);
