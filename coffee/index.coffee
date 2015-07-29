@@ -1,9 +1,3 @@
-# TODO
-# test tool
-# write code to compare two sqlite databases and generate a diff report
-# compiling: coffee -p index.coffee > index.js
-
-
 # =============================================================================
 #
 # Query strings

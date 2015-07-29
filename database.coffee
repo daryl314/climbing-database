@@ -98,7 +98,7 @@ registerPut = (table, id) ->
   restapi.put "/#{table}/:id", (req, res) ->
     console.log "PUT: #{JSON.stringify(req.body)}"
     assignmentData = _.map( req.body, (v,k) ->
-      k + "=" + if _.isNumber(v) then v else "'#{{v}}'"
+      k + "=" + if _.isNumber(v) then v else "'#{v}'"
     ).join(', ')
     query = "UPDATE #{table} SET #{assignmentData} WHERE #{id}=#{req.params.id}"
     executeQuery query, res, 202    # 202 = Accepted

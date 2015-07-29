@@ -213,7 +213,10 @@ jQuery ->
 
     # Get list of best sends
     [ rp, fl, os ] = [ 'redpoint', 'flash', 'onsight' ]
-    best = (style,prefix) -> $.grep(data, (x)->x.Style==style && x.Grade[0]==prefix)[0]
+    best = (style,prefix) -> $.grep(
+      _.sortBy(data,(x)->x.GradeSort).reverse(),
+      (x) -> x.Style==style && x.Grade[0]==prefix
+    )[0]
     bestSends = [ best(rp,'5'), best(fl,'5'), best(os,'5'), best(rp,'V'), best(fl,'V') ]
 
     # Build HTML output for best sends
