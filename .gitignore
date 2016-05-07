@@ -4,5 +4,8 @@ climbing.db
 # ignore backups
 /backups/*
 
+# ignore local symlink
+OldCode
+
 # ignore tilde files
 *~

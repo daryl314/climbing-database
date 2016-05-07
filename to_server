@@ -9,16 +9,24 @@ echo "Local server found.  Updating data on remote server"
 mkdir -p tmp
 
 # generate send data javascript file
-echo "data="`curl --silent localhost:3000/Sends` > tmp/send-data.js
+echo "data="`curl --silent localhost:3000/Sends` > tmp/send_data.js
+
+# generate page javascript file
+curl --silent localhost:3000/sends.js > tmp/sends.js
 
 # generate index.html including send data
-sed 's/<script src="index.js">/<script src="send-data.js"><\/script>\n  <script src="index.js">/' \
-  < public/index.html \
-  > tmp/sends_dynamic.html 
+sed 's/<script type="text\/javascript" src="sends.js">/<script type="text\/javascript" src="send-data.js"><\/script>\n    <script type="text\/javascript" src="sends.js">/' \
+  < public/sends.html \
+  > tmp/sends.html 
 
 # copy data to remote server
-scp tmp/sends_dynamic.html root@darylstlaurent.com:/var/www/public_root/climbing/
-scp tmp/send-data.js       root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q public/sends_static.html root@darylstlaurent.com:/var/www/public_root/climbing/sends.html
+scp -q public/sends.css         root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q public/node.png          root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q public/vline.png         root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q public/lastnode.png      root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q tmp/send_data.js         root@darylstlaurent.com:/var/www/public_root/climbing/
+scp -q tmp/sends.js             root@darylstlaurent.com:/var/www/public_root/climbing/
 
 # cleanup
 rm -rf tmp
