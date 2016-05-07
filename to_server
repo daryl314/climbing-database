@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# confirm that server is running
+curl --silent localhost:3000 > /dev/null || echo "Local server not running!"
+curl --silent localhost:3000 > /dev/null || exit
+echo "Local server found.  Updating data on remote server"
+
+# generate a temporary directory to contain processed output
+mkdir -p tmp
+
+# generate send data javascript file
+echo "data="`curl --silent localhost:3000/Sends` > tmp/send-data.js
+
+# generate index.html including send data
+sed 's/<script src="index.js">/<script src="send-data.js"><\/script>\n  <script src="index.js">/' \
+  < public/index.html \
+  > tmp/sends_dynamic.html 
+
+# copy data to remote server
+scp tmp/sends_dynamic.html root@darylstlaurent.com:/var/www/public_root/climbing/
+scp tmp/send-data.js       root@darylstlaurent.com:/var/www/public_root/climbing/
+
+# cleanup
+rm -rf tmp
