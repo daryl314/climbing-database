@@ -304,8 +304,9 @@ jQuery ->
     $('#boulder_slider').position({my:'left center',at:'right center',of:'#boulder_value',offset:'12 0'})
 
     # Configure send list by area interactivity
-    $('li.area' ).click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
-    $('li.cliff').click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
+    toggle = (event) -> $(this).children().toggle(); event.stopPropagation()
+    $('div#sends_by_area').on('click', 'li.area',  toggle)
+    $('div#sends_by_area').on('click', 'li.cliff', toggle)
 
   # Function to perform refresh
   doRefresh = ->
