@@ -46,31 +46,30 @@ jQuery ->
   #
   # ----------------------------------------------------------------------
 
-  # Load data from ajax request if not already loaded
-  unless root.data?
-    $.ajax
-      url:      '/Sends'
-      success:  (x) -> root.data = x
-      async:    false
-
   # Calculate year and grade buckets
-  root.processedData = _.map root.data, (x) ->
-    x.YearBucket  = Math.floor dateDelta(x.SendDate, Date())
-    x.GradeBucket = roundGrade x.GradeSort
-    x
+  processData = () ->
+    root.processedData = _.map root.data, (x) ->
+      x.YearBucket  = Math.floor dateDelta(x.SendDate, Date())
+      x.GradeBucket = roundGrade x.GradeSort
+      x
 
   # Unique route and boulder grades
-  uniqueGrades = _.chain(processedData).pluck('GradeBucket').unique().sort().value()
-  uniqueBoulder = $.grep(uniqueGrades, (x) -> x[0] == 'V' )
-  uniqueRoute   = $.grep(uniqueGrades, (x) -> x[0] != 'V' )
-  unique = { grades:uniqueGrades, boulder:uniqueBoulder, route:uniqueRoute }
+  uniqueGrades = () ->
+    _.chain(root.processedData).pluck('GradeBucket').unique().sort().value()
+  uniques = () ->
+    grades  : uniqueGrades()
+    boulder : $.grep(uniqueGrades(), (x) -> x[0] == 'V' )
+    route   : $.grep(uniqueGrades(), (x) -> x[0] != 'V' )
 
   # Function to return filtered data based on thresholds
-  filteredData = ->
-    minRoute   = $.inArray($('#route_value').data('value'),unique.route)
-    minBoulder = $.inArray($('#boulder_value').data('value'),unique.boulder)
-    $.grep(data, (x)-> $.inArray(x.GradeBucket,unique.route)>=minRoute ||
-      $.inArray(x.GradeBucket,unique.boulder)>=minBoulder)
+  filteredData = () ->
+    unique = uniques(root.processedData)
+    minRoute   = $.inArray($('#route_value'  ).data('value'), unique.route  )
+    minBoulder = $.inArray($('#boulder_value').data('value'), unique.boulder)
+    $.grep(data, (x)->
+      $.inArray(x.GradeBucket,unique.route  ) >= minRoute   ||
+      $.inArray(x.GradeBucket,unique.boulder) >= minBoulder
+    )
 
   # ----------------------------------------------------------------------
   #
@@ -214,7 +213,7 @@ jQuery ->
     # Get list of best sends
     [ rp, fl, os ] = [ 'redpoint', 'flash', 'onsight' ]
     best = (style,prefix) -> $.grep(
-      _.sortBy(data,(x)->x.GradeSort).reverse(),
+      _.sortBy(root.data,(x)->x.GradeSort).reverse(),
       (x) -> x.Style==style && x.Grade[0]==prefix
     )[0]
     bestSends = [ best(rp,'5'), best(fl,'5'), best(os,'5'), best(rp,'V'), best(fl,'V') ]
@@ -226,7 +225,7 @@ jQuery ->
     ).join('')
 
     # Build HTML content for most recent sends
-    $('#recent_sends').html $.map(_.sortBy(data,(x)->x.SendDate).reverse()[0...5], (x)->
+    $('#recent_sends').html $.map(_.sortBy(root.data,(x)->x.SendDate).reverse()[0...5], (x)->
       "#{x.Route} (#{x.Grade}) #{_.capitalize x.Style} #{x.SendDate}<br>\n"
     ).join('')
 
@@ -245,7 +244,7 @@ jQuery ->
     areaList = _.chain(processedData).pluck('Area').unique().value().sort()
     _.each areaList, (area) ->
         html = html.concat("  <li class='area'>#{area}<ul style='display:none'>\n")
-        cragList = _.chain(processedData)
+        cragList = _.chain(root.processedData)
             .filter( (x) -> x.Area == area )
             .pluck( 'Cliff' )
             .unique()
@@ -253,7 +252,7 @@ jQuery ->
             .sort()
         _.each cragList, (crag) ->
             html = html.concat("    <li class='cliff'>#{crag}\n    <ul style='display:none'>\n")
-            sendList = _.chain(processedData)
+            sendList = _.chain(root.processedData)
                 .filter( (x) -> x.Area == area && x.Cliff == crag )
                 .map( (x) -> "      <li class='climb'>#{x.Route} (#{x.Grade})" )
                 .value()
@@ -274,37 +273,57 @@ jQuery ->
   $('#route_value').data('value','5.12a').text('5.12a')
   $('#boulder_value').data('value','V06').text('V6')
 
-  # Create plot and content from default grade thresholds
+  # jQuery setup actions
+  setup = ->
+
+    # unique route and boulder grades
+    uniqueRoute = uniques().route
+    uniqueBoulder = uniques().boulder
+
+    # Create a slider for unique route grades
+    $('#route_slider').slider
+      value: $.inArray($('#route_value').data('value'),uniqueRoute)
+      max: uniqueRoute.length-1
+      stop: -> doRefresh()
+      slide: (event,info) ->
+        grade = uniqueRoute[info.value]
+        $('#route_value').data('value',grade).text(trimZeroes(grade))
+
+    # Create a slider for unique boulder grades
+    $('#boulder_slider').slider
+      value: $.inArray($('#boulder_value').data('value'),uniqueBoulder)
+      max: uniqueBoulder.length-1
+      stop: -> doRefresh()
+      slide: (event,info) ->
+        grade = uniqueBoulder[info.value]
+        $('#boulder_value').data('value',grade).text(trimZeroes(grade))
+
+    # Move sliders and buttons
+    $('#route_slider'  ).position({my:'left center',at:'right center',of:'#route_value',  offset:'12 0'})
+    $('#boulder_value' ).position({my:'left center',at:'right center',of:'#route_slider', offset:'25 0'})
+    $('#boulder_slider').position({my:'left center',at:'right center',of:'#boulder_value',offset:'12 0'})
+
+    # Configure send list by area interactivity
+    $('li.area' ).click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
+    $('li.cliff').click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
+
+  # Function to perform refresh
   doRefresh = ->
     refreshBarChart()
     refreshContent()
     refreshAreaCharts()
-  doRefresh()
-  buildTree()
 
-  # Create a slider for unique route grades
-  $('#route_slider').slider
-    value: $.inArray($('#route_value').data('value'),uniqueRoute)
-    max: uniqueRoute.length-1
-    stop: -> doRefresh()
-    slide: (event,info) ->
-      grade = uniqueRoute[info.value]
-      $('#route_value').data('value',grade).text(trimZeroes(grade))
-
-  # Create a slider for unique boulder grades
-  $('#boulder_slider').slider
-    value: $.inArray($('#boulder_value').data('value'),uniqueBoulder)
-    max: uniqueBoulder.length-1
-    stop: -> doRefresh()
-    slide: (event,info) ->
-      grade = uniqueBoulder[info.value]
-      $('#boulder_value').data('value',grade).text(trimZeroes(grade))
-
-  # Move sliders and buttons
-  $('#route_slider'  ).position({my:'left center',at:'right center',of:'#route_value',  offset:'12 0'})
-  $('#boulder_value' ).position({my:'left center',at:'right center',of:'#route_slider', offset:'25 0'})
-  $('#boulder_slider').position({my:'left center',at:'right center',of:'#boulder_value',offset:'12 0'})
-
-  # Configure send list by area interactivity
-  $('li.area' ).click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
-  $('li.cliff').click( (event) -> $(this).children().toggle(); event.stopPropagation()  )
+  # Load data and kick everything into motion
+  if root.data? # use provided data
+    processData()
+    setup()
+    doRefresh()
+    buildTree()
+  else # fetch data with ajax
+    $.ajax( url:'/Sends' ).done((x) ->
+      root.data = x
+      processData()
+      setup()
+      doRefresh()
+      buildTree()
+    )
