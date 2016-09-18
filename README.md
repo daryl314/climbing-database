@@ -22,6 +22,11 @@ From root directory of project:
 ```
 npm install sqlite3 express lodash body-parser coffee-script
 ```
+To install sqlite3 from source (which in theory won't need to be updated when system
+version of sqlite3 changes):
+```
+npm install sqlite3 --build-from-source
+```
 
 # Usage
 
