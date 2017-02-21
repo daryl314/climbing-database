@@ -1,3 +1,5 @@
+![Database interface](/climbingdb.png?raw=true "Database interface")
+
 # Installation
 
 ## Install prerequisites
