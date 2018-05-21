@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<head>
+  <title>Vega Lite Bar Chart</title>
+  <meta charset="utf-8">
+
+  <script src="data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega@3.3.1/build/vega.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@2.4.3/build/vega-lite.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@3.9.0/build/vega-embed.js"></script>
+
+  <style media="screen">
+    /* Add space between Vega-Embed links  */
+    .vega-actions a {
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Template for Embedding Vega-Lite Visualization</h1>
+  <!-- Container for the visualization -->
+  <!-- <div id="vis1"></div> -->
+  <div id="vis2"></div>
+  <div id="vis3"></div>
+  <div id="vis4"></div>
+
+  <script>
+
+//   var vlSpec1 = {
+//     "$schema": "https://vega.github.io/schema/vega-lite/v2.json",
+//     "width":500,
+//     "height":300,
+//   "data": {"values":data},
+//   "mark": "bar",
+//   "transform":[
+//     {"calculate":"datum.Years > 4 ? '5+' : datum.Years+''", "as":"YearBucket"},
+//     {"filter":{"field":"GradeSort", "range":[512,515]}}
+//   ],
+//   "encoding": {
+//     "x": {
+//       "field":"Grade",
+//       "type":"ordinal",
+//       "sort":{"field":"GradeSort"}
+//     },
+//     "order": {
+//       "field":"YearBucket",
+//       "type":"ordinal"
+//     },
+//     "y": {
+//       "aggregate": "count",
+//       "type": "quantitative"
+//     },
+//     "tooltip":{"field":"Grade",'type':"ordinal"},
+//     "color": {
+//       "type":"ordinal",
+//       "field":"YearBucket",
+//       "scale":{"reverse":true,"scheme":"yelloworangered-6"}//,"domain":[0,1,2,3,4,"5+"]}
+//     }
+//   }
+// };
+
+// calculate some additional fields
+var now = new Date();
+var minYear = now.getFullYear();
+var foundGrades = {};
+var gradeSort = [];
+data.forEach(x => {
+  x.SendDate = new Date(x.SendDate);
+  x.Year = x.SendDate.getFullYear();
+  x.Years = Math.floor((now - x.SendDate) / 1000 / 60 / 60 / 24 / 365.25);
+  x.Grade = x.Grade.slice(0,5);
+  minYear = x.Year < minYear ? x.Year : minYear;
+  if (!foundGrades[x.Grade]) {
+    foundGrades[x.Grade] = x.GradeSort;
+    gradeSort.push(x.Grade);
+  }
+});
+
+// create pivot table
+var pivot = [];
+for (let y = minYear; y <= now.getFullYear(); y++) {
+  let pivotRow = {};
+  gradeSort.forEach(g => {
+    pivotRow[g] = 0;
+  })
+  pivot.push(pivotRow);
+}
+data.forEach(x => {
+  let i = x.Year - minYear;
+  pivot[i][x.Grade] += 1;
+});
+
+// stack data
+var stacked = [];
+for (let i = 0; i < pivot.length; i++) {
+  let year = minYear + i;
+  let row = pivot[i];
+  gradeSort.forEach(g => {
+    stacked.push({
+      Year: year,
+      Grade: g,
+      GradeSort: foundGrades[g],
+      Sends: row[g]
+    });
+  });
+};
+
+// filter stacked data
+let ry = stacked.filter(x => x.GradeSort >= 512);
+let by = stacked.filter(x => x.GradeSort >= 6 && x.GradeSort < 20);
+
+
+var vlSpec2 = {
+  "$schema": "https://vega.github.io/schema/vega/v3.0.json",
+  "autosize": "pad",
+  "padding": 5,
+  "width": 500,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": data
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"GradeSort\"])",
+          "as": "GradeSort"
+        },
+        {
+          "type": "formula",
+          "expr": "datum.Years > 4 ? 5 : datum.Years",
+          "as": "YearBucket"
+        },
+        {"type": "filter", "expr": "inrange(datum[\"GradeSort\"], [6, 15]) || inrange(datum[\"GradeSort\"], [512,515])"},
+        {
+          "type": "aggregate",
+          "groupby": ["Grade", "YearBucket"],
+          "ops": ["count"],
+          "fields": ["*"],
+          "as": ["count_*"]
+        },
+        {
+          "type": "stack",
+          "groupby": ["Grade"],
+          "field": "count_*",
+          "sort": {"field": ["YearBucket"], "order": ["ascending"]},
+          "as": ["count_*_start", "count_*_end"],
+          "offset": "zero"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": ["bar"],
+      "from": {"data": "data_0"},
+      "encode": {
+        "update": {
+          "fill": {"scale": "color", "field": "YearBucket"},
+          "tooltip": {"signal": "''+datum[\"Grade\"]"},
+          "x": {"scale": "x", "field": "Grade"},
+          "width": {"scale": "x", "band": true},
+          "y": {"scale": "y", "field": "count_*_end"},
+          "y2": {"scale": "y", "field": "count_*_start"}
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {"data": "data_0", "field": "Grade"},
+      "range": [0, {"signal": "width"}],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {"data": "data_0", "fields": ["count_*_start", "count_*_end"]},
+      "range": [{"signal": "height"}, 0],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [0,1,2,3,4,5],
+      "range": {"scheme": "yelloworangebrown-6"},
+      "reverse": true
+    },
+        {
+      "name": "legend_labels",
+      "type": "ordinal",
+      "range": {"scheme": "yelloworangebrown-6"},
+      "domain": ["0 Years","1 Year","2 Years","3 Years","4 Years","5+ Years"],
+      "reverse": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "title": "Grade",
+      "labelOverlap": true,
+      "encode": {
+        "labels": {
+          "update": {
+            "angle": {"value": 270},
+            "align": {"value": "right"},
+            "baseline": {"value": "middle"}
+          }
+        }
+      },
+      "zindex": 1
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "title": "Number of Sends",
+      "labelOverlap": true,
+      "tickCount": {"signal": "ceil(height/40)"},
+      "zindex": 1
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": true,
+      "tickCount": {"signal": "ceil(height/40)"},
+      "gridScale": "x",
+      "domain": false,
+      "labels": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "legend_labels",
+      // "title": "YearBucket",
+      "encode": {"symbols": {"update": {"shape": {"value": "square"}}}}
+    }
+  ],
+  "config": {"axisY": {"minExtent": 30}}
+};
+
+var vlSpec3 = {
+  "$schema": "https://vega.github.io/schema/vega/v3.json",
+  "width": 600,
+  "height": 300,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": ry,
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["Year"],
+          "sort": {"field": "Grade", "order": "descending"},
+          "field": "Sends"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "range": "width",
+      "domain": {"data": "table", "field": "Year"}
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "range": "height",
+      "nice": true,
+      "zero": true,
+      "domain": {"data": "table", "field": "y1"}
+    },
+    {"name": "color", "type": "ordinal", "domain":{"data": "table", "field": "Grade"}, "range": {"scheme": "category20b"}}
+    // {
+    //   "name": "legend_labels",
+    //   "type": "ordinal",
+    //   "range": {"scheme": "category20"},
+    //   "domain": ["V6", "V7", "V8", "V9", "V10"]
+    // }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "zindex": 0,
+      "title": "Year",
+      "grid": true
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "zindex": 0,
+      "title": "Sends",
+      "grid": true
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {"facet": {"name": "series", "data": "table", "groupby": "Grade"}},
+      "marks": [
+        {
+          "type": "area",
+          "from": {"data": "series"},
+          "encode": {
+            "enter": {
+              "x": {"scale": "x", "field": "Year"},
+              "y": {"scale": "y", "field": "y0"},
+              "y2": {"scale": "y", "field": "y1"},
+              "fill": {"scale": "color", "field": "Grade"}
+            },
+            "update": {
+              "fillOpacity": {"value": 1},
+              "fill":{"scale":"color","field":"Grade"}
+              },
+            "hover": {
+              "fill":{"value":"black"},
+              "fillOpacity": {"value": 0.5}
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "title": "Grade",
+      "encode": {
+        "labels": {
+          "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
+        }
+      }
+    }
+  ]
+};
+var vlSpec4 = {
+  "$schema": "https://vega.github.io/schema/vega/v3.json",
+  "width": 600,
+  "height": 300,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": by,
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["Year"],
+          "sort": {"field": "GradeSort", "order": "descending"},
+          "field": "Sends"
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "range": "width",
+      "domain": {"data": "table", "field": "Year"}
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "range": "height",
+      "nice": true,
+      "zero": true,
+      "domain": {"data": "table", "field": "y1"}
+    },
+    {"name": "color", "type": "ordinal", "range": {"scheme": "category20"}},
+    {
+      "name": "legend_labels",
+      "type": "ordinal",
+      "range": {"scheme": "category20"},
+      "domain": ["V6", "V7", "V8", "V9", "V10"]
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "zindex": 0,
+      "title": "Year",
+      "grid": true
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "zindex": 0,
+      "title": "Sends",
+      "grid": true
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {"facet": {"name": "series", "data": "table", "groupby": "GradeSort"}},
+      "marks": [
+        {
+          "type": "area",
+          "from": {"data": "series"},
+          "encode": {
+            "enter": {
+              "x": {"scale": "x", "field": "Year"},
+              "y": {"scale": "y", "field": "y0"},
+              "y2": {"scale": "y", "field": "y1"},
+              "fill": {"scale": "color", "field": "GradeSort"}
+            },
+            "update": {
+              "fillOpacity": {"value": 1},
+              "fill":{"scale":"color","field":"GradeSort"}
+              },
+            "hover": {
+              "fill":{"value":"black"},
+              "fillOpacity": {"value": 0.5}
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "legends": [
+    {
+      "fill": "legend_labels",
+      "title": "Grade",
+      "encode": {
+        "labels": {
+          "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
+        }
+      }
+    }
+  ]
+};
+
+// var vlSpec4 = {
+//   "$schema": "https://vega.github.io/schema/vega/v3.json",
+//   "width": 600,
+//   "height": 300,
+//   "padding": 5,
+//   "data": [
+//     {
+//       "name": "table",
+//       "values": [
+//         {"c": 6, "x": 2003, "y": 1},
+//         {"c": 6, "x": 2004, "y": 7},
+//         {"c": 6, "x": 2005, "y": 3},
+//         {"c": 6, "x": 2006, "y": 1},
+//         {"c": 6, "x": 2007, "y": 2},
+//         {"c": 6, "x": 2008, "y": 2},
+//         {"c": 6, "x": 2009, "y": 0},
+//         {"c": 6, "x": 2010, "y": 4},
+//         {"c": 6, "x": 2011, "y": 2},
+//         {"c": 6, "x": 2012, "y": 0},
+//         {"c": 6, "x": 2013, "y": 0},
+//         {"c": 6, "x": 2014, "y": 0},
+//         {"c": 6, "x": 2015, "y": 0},
+//         {"c": 6, "x": 2016, "y": 0},
+//         {"c": 6, "x": 2017, "y": 0},
+//         {"c": 6, "x": 2018, "y": 0},
+//         {"c": 7, "x": 2003, "y": 0},
+//         {"c": 7, "x": 2004, "y": 0},
+//         {"c": 7, "x": 2005, "y": 2},
+//         {"c": 7, "x": 2006, "y": 1},
+//         {"c": 7, "x": 2007, "y": 2},
+//         {"c": 7, "x": 2008, "y": 1},
+//         {"c": 7, "x": 2009, "y": 1},
+//         {"c": 7, "x": 2010, "y": 5},
+//         {"c": 7, "x": 2011, "y": 0},
+//         {"c": 7, "x": 2012, "y": 0},
+//         {"c": 7, "x": 2013, "y": 0},
+//         {"c": 7, "x": 2014, "y": 1},
+//         {"c": 7, "x": 2015, "y": 0},
+//         {"c": 7, "x": 2016, "y": 2},
+//         {"c": 7, "x": 2017, "y": 0},
+//         {"c": 7, "x": 2018, "y": 0},
+//         {"c": 8, "x": 2003, "y": 0},
+//         {"c": 8, "x": 2004, "y": 0},
+//         {"c": 8, "x": 2005, "y": 1},
+//         {"c": 8, "x": 2006, "y": 1},
+//         {"c": 8, "x": 2007, "y": 1},
+//         {"c": 8, "x": 2008, "y": 1},
+//         {"c": 8, "x": 2009, "y": 0},
+//         {"c": 8, "x": 2010, "y": 0},
+//         {"c": 8, "x": 2011, "y": 0},
+//         {"c": 8, "x": 2012, "y": 2},
+//         {"c": 8, "x": 2013, "y": 0},
+//         {"c": 8, "x": 2014, "y": 0},
+//         {"c": 8, "x": 2015, "y": 0},
+//         {"c": 8, "x": 2016, "y": 1},
+//         {"c": 8, "x": 2017, "y": 0},
+//         {"c": 8, "x": 2018, "y": 0},
+//         {"c": 9, "x": 2003, "y": 0},
+//         {"c": 9, "x": 2004, "y": 0},
+//         {"c": 9, "x": 2005, "y": 0},
+//         {"c": 9, "x": 2006, "y": 0},
+//         {"c": 9, "x": 2007, "y": 1},
+//         {"c": 9, "x": 2008, "y": 1},
+//         {"c": 9, "x": 2009, "y": 0},
+//         {"c": 9, "x": 2010, "y": 0},
+//         {"c": 9, "x": 2011, "y": 0},
+//         {"c": 9, "x": 2012, "y": 2},
+//         {"c": 9, "x": 2013, "y": 0},
+//         {"c": 9, "x": 2014, "y": 0},
+//         {"c": 9, "x": 2015, "y": 0},
+//         {"c": 9, "x": 2016, "y": 1},
+//         {"c": 9, "x": 2017, "y": 0},
+//         {"c": 9, "x": 2018, "y": 0},
+//         {"c": 10, "x": 2003, "y": 0},
+//         {"c": 10, "x": 2004, "y": 0},
+//         {"c": 10, "x": 2005, "y": 0},
+//         {"c": 10, "x": 2006, "y": 0},
+//         {"c": 10, "x": 2007, "y": 0},
+//         {"c": 10, "x": 2008, "y": 0},
+//         {"c": 10, "x": 2009, "y": 0},
+//         {"c": 10, "x": 2010, "y": 0},
+//         {"c": 10, "x": 2011, "y": 0},
+//         {"c": 10, "x": 2012, "y": 1},
+//         {"c": 10, "x": 2013, "y": 0},
+//         {"c": 10, "x": 2014, "y": 0},
+//         {"c": 10, "x": 2015, "y": 0},
+//         {"c": 10, "x": 2016, "y": 0},
+//         {"c": 10, "x": 2017, "y": 0},
+//         {"c": 10, "x": 2018, "y": 0}
+//       ],
+//       "transform": [
+//         {
+//           "type": "stack",
+//           "groupby": ["x"],
+//           "sort": {"field": "c", "order": "descending"},
+//           "field": "y"
+//         }
+//       ]
+//     }
+//   ],
+//   "scales": [
+//     {
+//       "name": "x",
+//       "type": "point",
+//       "range": "width",
+//       "domain": {"data": "table", "field": "x"}
+//     },
+//     {
+//       "name": "y",
+//       "type": "linear",
+//       "range": "height",
+//       "nice": true,
+//       "zero": true,
+//       "domain": {"data": "table", "field": "y1"}
+//     },
+//     {"name": "color", "type": "ordinal", "range": {"scheme": "category20"}},
+//     {
+//       "name": "legend_labels",
+//       "type": "ordinal",
+//       "range": {"scheme": "category20"},
+//       "domain": ["V6", "V7", "V8", "V9", "V10"]
+//     }
+//   ],
+//   "axes": [
+//     {
+//       "orient": "bottom",
+//       "scale": "x",
+//       "zindex": 0,
+//       "title": "Year",
+//       "grid": true
+//     },
+//     {
+//       "orient": "left",
+//       "scale": "y",
+//       "zindex": 0,
+//       "title": "Sends",
+//       "grid": true
+//     }
+//   ],
+//   "marks": [
+//     {
+//       "type": "group",
+//       "from": {"facet": {"name": "series", "data": "table", "groupby": "c"}},
+//       "marks": [
+//         {
+//           "type": "area",
+//           "from": {"data": "series"},
+//           "encode": {
+//             "enter": {
+//               "x": {"scale": "x", "field": "x"},
+//               "y": {"scale": "y", "field": "y0"},
+//               "y2": {"scale": "y", "field": "y1"},
+//               "fill": {"scale": "color", "field": "c"}
+//             },
+//             "update": {
+//               "fillOpacity": {"value": 1},
+//               "fill":{"scale":"color","field":"c"}
+//               },
+//             "hover": {
+//               "fill":{"value":"black"},
+//               "fillOpacity": {"value": 0.5}
+//             }
+//           }
+//         }
+//       ]
+//     }
+//   ],
+//   "legends": [
+//     {
+//       "fill": "legend_labels",
+//       "title": "Grade",
+//       "encode": {
+//         "labels": {
+//           "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
+//         }
+//       }
+//     }
+//   ]
+// };
+
+  // Embed the visualization in the container with id `vis`
+  // vegaEmbed("#vis1", vlSpec1);
+  vegaEmbed("#vis2", vlSpec2);
+  vegaEmbed("#vis3", vlSpec3);
+  vegaEmbed("#vis4", vlSpec4);
+  </script>
+</body>
+</html>
