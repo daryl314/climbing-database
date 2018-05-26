@@ -4,9 +4,9 @@
   <meta charset="utf-8">
 
   <script src="data.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega@3.3.1/build/vega.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-lite@2.4.3/build/vega-lite.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-embed@3.9.0/build/vega-embed.js"></script>
+  <script src="jslib/vega.3_3_1.min.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/vega-lite@2.4.3/build/vega-lite.js"></script> -->
+  <script src="jslib/vega-embed.3_9_0.min.js"></script>
 
   <style media="screen">
     /* Add space between Vega-Embed links  */
@@ -24,39 +24,6 @@
   <div id="vis4"></div>
 
   <script>
-
-//   var vlSpec1 = {
-//     "$schema": "https://vega.github.io/schema/vega-lite/v2.json",
-//     "width":500,
-//     "height":300,
-//   "data": {"values":data},
-//   "mark": "bar",
-//   "transform":[
-//     {"calculate":"datum.Years > 4 ? '5+' : datum.Years+''", "as":"YearBucket"},
-//     {"filter":{"field":"GradeSort", "range":[512,515]}}
-//   ],
-//   "encoding": {
-//     "x": {
-//       "field":"Grade",
-//       "type":"ordinal",
-//       "sort":{"field":"GradeSort"}
-//     },
-//     "order": {
-//       "field":"YearBucket",
-//       "type":"ordinal"
-//     },
-//     "y": {
-//       "aggregate": "count",
-//       "type": "quantitative"
-//     },
-//     "tooltip":{"field":"Grade",'type':"ordinal"},
-//     "color": {
-//       "type":"ordinal",
-//       "field":"YearBucket",
-//       "scale":{"reverse":true,"scheme":"yelloworangered-6"}//,"domain":[0,1,2,3,4,"5+"]}
-//     }
-//   }
-// };
 
 // calculate some additional fields
 var now = new Date();
@@ -108,42 +75,173 @@ for (let i = 0; i < pivot.length; i++) {
 let ry = stacked.filter(x => x.GradeSort >= 512);
 let by = stacked.filter(x => x.GradeSort >= 6 && x.GradeSort < 20);
 
+// minimum grade to show
+let minBoulder = 6;  // V6
+let minRoute = 512;  // 5.12
+
+function areaChart(data, colorMap="category20") {
+  return {
+
+    // vega 3 chart...
+    "$schema": "https://vega.github.io/schema/vega/v3.json",
+    "width": 600,
+    "height": 300,
+    "padding": 5,
+    "description": "Stacked area chart of sends over time",
+    "title": "Sends over time",
+
+    // define input data: function input as "table"
+    "data": [{
+      "name": "table",
+      "values": data,
+
+      // stack data grouped by Year and sorted by GradeSort
+      "transform": [{
+        "type": "stack",
+        "groupby": ["Year"],
+        "sort": {"field": "GradeSort", "order": "descending"},
+        "field": "Sends",
+        "as": ["y0","y1"] // computed output fields (defaults to y0,y1)
+      }]
+    }],
+
+    // define mappings from data values to visual values (pixels, colors, sizes)
+    "scales": [
+      { // x values come from 'Year' column in 'table'
+        "name": "x",
+        "type": "point",
+        "range": "width",
+        "domain": {"data": "table", "field": "Year"}
+      }, { // y values come from high-side computed stack
+        "name": "y",
+        "type": "linear",
+        "range": "height",
+        "nice": true,  // extend domain to end on nice round numbers
+        "zero": true,  // include zero in the domain
+        "domain": {"data": "table", "field": "y1"}
+      }, { // define a color map for data
+        "name": "color", 
+        "type": "ordinal", 
+        "range": {"scheme": colorMap}
+      }, { // define legend labels that correspond to color map
+        "name": "legend_labels",
+        "type": "ordinal",
+        "range": {"scheme": colorMap},
+        // sort order for legend labels
+        "domain": data.filter(x => x.Year == data[0].Year).map(x => x.Grade)
+      }
+    ],
+
+    // define axes
+    "axes": [{
+        "orient": "bottom",
+        "scale": "x",
+        "zindex": 0,
+        "title": "Year",
+        "grid": true
+      },{
+        "orient": "left",
+        "scale": "y",
+        "zindex": 0,
+        "title": "Sends",
+        "grid": true
+      }
+    ],
+
+    // define visual encoding
+    "marks": [{
+      "type": "group",
+      "from": {"facet": {"name": "series", "data": "table", "groupby": "GradeSort"}},
+
+      // define 'area' encoding
+      "marks": [{
+        "type": "area",
+        "from": {"data": "series"},
+
+        // properties of the area chart
+        "encode": {
+
+          // area mark properties applied when the marks are created
+          "enter": {
+            "x": {"scale": "x", "field": "Year"},
+            "y": {"scale": "y", "field": "y0"},
+            "y2": {"scale": "y", "field": "y1"},
+          },
+
+          // area mark properties applied when updates happen (or when hover exits)
+          "update": {
+            "fillOpacity": {"value": 1},
+            "fill":{"scale":"color","field":"GradeSort"}
+          },
+
+          // area mark properties applied on hover
+          "hover": {
+            "fill":{"value":"black"},
+            "fillOpacity": {"value": 0.5}
+          }
+        }
+      }]
+    }],
+
+    // define a legend using the custom labels
+    "legends": [{
+      "fill": "legend_labels",
+      "title": "Grade",
+      "encode": {
+        "labels": {
+          "update": {
+            "fontSize": {"value": 16}, 
+            "fill": {"value": "black"}}
+        }
+      }
+    }]
+  }
+}
+
 
 var vlSpec2 = {
+
+  // vega 3 chart...
   "$schema": "https://vega.github.io/schema/vega/v3.0.json",
-  "autosize": "pad",
   "padding": 5,
   "width": 500,
   "height": 300,
-  "style": "cell",
+  "description": "Climbing sends bar chart",
+  "title": "Distribution of sends",
+
+  // define data
   "data": [
-    {
+
+    {  // attach data to source_0 data sourc
       "name": "source_0",
       "values": data
     },
-    {
+    
+    { // compute data_0 based on source_0...
       "name": "data_0",
       "source": "source_0",
       "transform": [
-        {
-          "type": "formula",
-          "expr": "toNumber(datum[\"GradeSort\"])",
-          "as": "GradeSort"
-        },
-        {
+
+        { // bucket by year clipped at 5 years
           "type": "formula",
           "expr": "datum.Years > 4 ? 5 : datum.Years",
           "as": "YearBucket"
         },
-        {"type": "filter", "expr": "inrange(datum[\"GradeSort\"], [6, 15]) || inrange(datum[\"GradeSort\"], [512,515])"},
-        {
+
+        { // filter out data below minimum grade
+          "type": "filter", 
+          "expr": `inrange(datum["GradeSort"], [${minBoulder}, 15]) || inrange(datum["GradeSort"], [${minRoute},515])`
+        },
+        
+        { // agggregate data by YearBucket
           "type": "aggregate",
           "groupby": ["Grade", "YearBucket"],
           "ops": ["count"],
           "fields": ["*"],
           "as": ["count_*"]
         },
-        {
+        
+        { // create a stacking series based on aggregation
           "type": "stack",
           "groupby": ["Grade"],
           "field": "count_*",
@@ -154,49 +252,47 @@ var vlSpec2 = {
       ]
     }
   ],
-  "marks": [
-    {
-      "name": "marks",
-      "type": "rect",
-      "style": ["bar"],
-      "from": {"data": "data_0"},
-      "encode": {
-        "update": {
-          "fill": {"scale": "color", "field": "YearBucket"},
-          "tooltip": {"signal": "''+datum[\"Grade\"]"},
-          "x": {"scale": "x", "field": "Grade"},
-          "width": {"scale": "x", "band": true},
-          "y": {"scale": "y", "field": "count_*_end"},
-          "y2": {"scale": "y", "field": "count_*_start"}
-        }
+
+  // define bar data
+  "marks": [{
+    "name": "marks",
+    "type": "rect",
+    "style": ["bar"],
+    "from": {"data": "data_0"},
+    "encode": {
+      "update": {
+        "fill": {"scale": "color", "field": "YearBucket"},
+        "tooltip": {"signal": "''+datum[\"Grade\"]"},
+        "x": {"scale": "x", "field": "Grade"},
+        "width": {"scale": "x", "band": true},
+        "y": {"scale": "y", "field": "count_*_end"},
+        "y2": {"scale": "y", "field": "count_*_start"}
       }
     }
-  ],
-  "scales": [
-    {
+  }],
+
+  // define mappings from data values to visual values (pixels, colors, sizes)
+  "scales": [{
       "name": "x",
       "type": "band",
       "domain": {"data": "data_0", "field": "Grade"},
       "range": [0, {"signal": "width"}],
       "paddingInner": 0.1,
       "paddingOuter": 0.05
-    },
-    {
+    },{
       "name": "y",
       "type": "linear",
       "domain": {"data": "data_0", "fields": ["count_*_start", "count_*_end"]},
       "range": [{"signal": "height"}, 0],
       "nice": true,
       "zero": true
-    },
-    {
+    },{ // color map for data
       "name": "color",
       "type": "ordinal",
       "domain": [0,1,2,3,4,5],
       "range": {"scheme": "yelloworangebrown-6"},
       "reverse": true
-    },
-        {
+    },{ // custom legend labels matching data color map
       "name": "legend_labels",
       "type": "ordinal",
       "range": {"scheme": "yelloworangebrown-6"},
@@ -204,251 +300,250 @@ var vlSpec2 = {
       "reverse": true
     }
   ],
-  "axes": [
-    {
-      "scale": "x",
-      "orient": "bottom",
-      "title": "Grade",
-      "labelOverlap": true,
-      "encode": {
-        "labels": {
-          "update": {
-            "angle": {"value": 270},
-            "align": {"value": "right"},
-            "baseline": {"value": "middle"}
-          }
+
+  // define axes
+  "axes": [{
+    "scale": "x",
+    "orient": "bottom",
+    "title": "Grade",
+    "labelOverlap": true,
+    "encode": {
+      "labels": {
+        "update": {
+          "angle": {"value": 270},
+          "align": {"value": "right"},
+          "baseline": {"value": "middle"}
         }
-      },
-      "zindex": 1
+      }
     },
-    {
-      "scale": "y",
-      "orient": "left",
-      "title": "Number of Sends",
-      "labelOverlap": true,
-      "tickCount": {"signal": "ceil(height/40)"},
-      "zindex": 1
-    },
-    {
-      "scale": "y",
-      "orient": "left",
-      "grid": true,
-      "tickCount": {"signal": "ceil(height/40)"},
-      "gridScale": "x",
-      "domain": false,
-      "labels": false,
-      "maxExtent": 0,
-      "minExtent": 0,
-      "ticks": false,
-      "zindex": 0
-    }
-  ],
-  "legends": [
-    {
-      "fill": "legend_labels",
-      // "title": "YearBucket",
-      "encode": {"symbols": {"update": {"shape": {"value": "square"}}}}
-    }
-  ],
+    "zindex": 1
+  },{
+    "scale": "y",
+    "orient": "left",
+    "title": "Number of Sends",
+    "labelOverlap": true,
+    "tickCount": {"signal": "ceil(height/40)"},
+    "zindex": 1
+  },{
+    "scale": "y",
+    "orient": "left",
+    "grid": true,
+    "tickCount": {"signal": "ceil(height/40)"},
+    "gridScale": "x",
+    "domain": false,
+    "labels": false,
+    "maxExtent": 0,
+    "minExtent": 0,
+    "ticks": false,
+    "zindex": 0
+  }],
+
+  // define legend using custom labels
+  "legends": [{
+    "fill": "legend_labels",
+    "encode": {"symbols": {"update": {"shape": {"value": "square"}}}}
+  }],
+
+  // min y axis range
   "config": {"axisY": {"minExtent": 30}}
 };
 
-var vlSpec3 = {
-  "$schema": "https://vega.github.io/schema/vega/v3.json",
-  "width": 600,
-  "height": 300,
-  "padding": 5,
-  "data": [
-    {
-      "name": "table",
-      "values": ry,
-      "transform": [
-        {
-          "type": "stack",
-          "groupby": ["Year"],
-          "sort": {"field": "Grade", "order": "descending"},
-          "field": "Sends"
-        }
-      ]
-    }
-  ],
-  "scales": [
-    {
-      "name": "x",
-      "type": "point",
-      "range": "width",
-      "domain": {"data": "table", "field": "Year"}
-    },
-    {
-      "name": "y",
-      "type": "linear",
-      "range": "height",
-      "nice": true,
-      "zero": true,
-      "domain": {"data": "table", "field": "y1"}
-    },
-    {"name": "color", "type": "ordinal", "domain":{"data": "table", "field": "Grade"}, "range": {"scheme": "category20b"}}
-    // {
-    //   "name": "legend_labels",
-    //   "type": "ordinal",
-    //   "range": {"scheme": "category20"},
-    //   "domain": ["V6", "V7", "V8", "V9", "V10"]
-    // }
-  ],
-  "axes": [
-    {
-      "orient": "bottom",
-      "scale": "x",
-      "zindex": 0,
-      "title": "Year",
-      "grid": true
-    },
-    {
-      "orient": "left",
-      "scale": "y",
-      "zindex": 0,
-      "title": "Sends",
-      "grid": true
-    }
-  ],
-  "marks": [
-    {
-      "type": "group",
-      "from": {"facet": {"name": "series", "data": "table", "groupby": "Grade"}},
-      "marks": [
-        {
-          "type": "area",
-          "from": {"data": "series"},
-          "encode": {
-            "enter": {
-              "x": {"scale": "x", "field": "Year"},
-              "y": {"scale": "y", "field": "y0"},
-              "y2": {"scale": "y", "field": "y1"},
-              "fill": {"scale": "color", "field": "Grade"}
-            },
-            "update": {
-              "fillOpacity": {"value": 1},
-              "fill":{"scale":"color","field":"Grade"}
-              },
-            "hover": {
-              "fill":{"value":"black"},
-              "fillOpacity": {"value": 0.5}
-            }
-          }
-        }
-      ]
-    }
-  ],
-  "legends": [
-    {
-      "fill": "color",
-      "title": "Grade",
-      "encode": {
-        "labels": {
-          "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
-        }
-      }
-    }
-  ]
-};
-var vlSpec4 = {
-  "$schema": "https://vega.github.io/schema/vega/v3.json",
-  "width": 600,
-  "height": 300,
-  "padding": 5,
-  "data": [
-    {
-      "name": "table",
-      "values": by,
-      "transform": [
-        {
-          "type": "stack",
-          "groupby": ["Year"],
-          "sort": {"field": "GradeSort", "order": "descending"},
-          "field": "Sends"
-        }
-      ]
-    }
-  ],
-  "scales": [
-    {
-      "name": "x",
-      "type": "point",
-      "range": "width",
-      "domain": {"data": "table", "field": "Year"}
-    },
-    {
-      "name": "y",
-      "type": "linear",
-      "range": "height",
-      "nice": true,
-      "zero": true,
-      "domain": {"data": "table", "field": "y1"}
-    },
-    {"name": "color", "type": "ordinal", "range": {"scheme": "category20"}},
-    {
-      "name": "legend_labels",
-      "type": "ordinal",
-      "range": {"scheme": "category20"},
-      "domain": ["V6", "V7", "V8", "V9", "V10"]
-    }
-  ],
-  "axes": [
-    {
-      "orient": "bottom",
-      "scale": "x",
-      "zindex": 0,
-      "title": "Year",
-      "grid": true
-    },
-    {
-      "orient": "left",
-      "scale": "y",
-      "zindex": 0,
-      "title": "Sends",
-      "grid": true
-    }
-  ],
-  "marks": [
-    {
-      "type": "group",
-      "from": {"facet": {"name": "series", "data": "table", "groupby": "GradeSort"}},
-      "marks": [
-        {
-          "type": "area",
-          "from": {"data": "series"},
-          "encode": {
-            "enter": {
-              "x": {"scale": "x", "field": "Year"},
-              "y": {"scale": "y", "field": "y0"},
-              "y2": {"scale": "y", "field": "y1"},
-              "fill": {"scale": "color", "field": "GradeSort"}
-            },
-            "update": {
-              "fillOpacity": {"value": 1},
-              "fill":{"scale":"color","field":"GradeSort"}
-              },
-            "hover": {
-              "fill":{"value":"black"},
-              "fillOpacity": {"value": 0.5}
-            }
-          }
-        }
-      ]
-    }
-  ],
-  "legends": [
-    {
-      "fill": "legend_labels",
-      "title": "Grade",
-      "encode": {
-        "labels": {
-          "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
-        }
-      }
-    }
-  ]
-};
+// var vlSpec3 = {
+//   "$schema": "https://vega.github.io/schema/vega/v3.json",
+//   "width": 600,
+//   "height": 300,
+//   "padding": 5,
+//   "data": [
+//     {
+//       "name": "table",
+//       "values": ry,
+//       "transform": [
+//         {
+//           "type": "stack",
+//           "groupby": ["Year"],
+//           "sort": {"field": "Grade", "order": "descending"},
+//           "field": "Sends"
+//         }
+//       ]
+//     }
+//   ],
+//   "scales": [
+//     {
+//       "name": "x",
+//       "type": "point",
+//       "range": "width",
+//       "domain": {"data": "table", "field": "Year"}
+//     },
+//     {
+//       "name": "y",
+//       "type": "linear",
+//       "range": "height",
+//       "nice": true,
+//       "zero": true,
+//       "domain": {"data": "table", "field": "y1"}
+//     },
+//     {"name": "color", "type": "ordinal", "domain":{"data": "table", "field": "Grade"}, "range": {"scheme": "category20b"}}
+//     // {
+//     //   "name": "legend_labels",
+//     //   "type": "ordinal",
+//     //   "range": {"scheme": "category20"},
+//     //   "domain": ["V6", "V7", "V8", "V9", "V10"]
+//     // }
+//   ],
+//   "axes": [
+//     {
+//       "orient": "bottom",
+//       "scale": "x",
+//       "zindex": 0,
+//       "title": "Year",
+//       "grid": true
+//     },
+//     {
+//       "orient": "left",
+//       "scale": "y",
+//       "zindex": 0,
+//       "title": "Sends",
+//       "grid": true
+//     }
+//   ],
+//   "marks": [
+//     {
+//       "type": "group",
+//       "from": {"facet": {"name": "series", "data": "table", "groupby": "Grade"}},
+//       "marks": [
+//         {
+//           "type": "area",
+//           "from": {"data": "series"},
+//           "encode": {
+//             "enter": {
+//               "x": {"scale": "x", "field": "Year"},
+//               "y": {"scale": "y", "field": "y0"},
+//               "y2": {"scale": "y", "field": "y1"},
+//               "fill": {"scale": "color", "field": "Grade"}
+//             },
+//             "update": {
+//               "fillOpacity": {"value": 1},
+//               "fill":{"scale":"color","field":"Grade"}
+//               },
+//             "hover": {
+//               "fill":{"value":"black"},
+//               "fillOpacity": {"value": 0.5}
+//             }
+//           }
+//         }
+//       ]
+//     }
+//   ],
+//   "legends": [
+//     {
+//       "fill": "color",
+//       "title": "Grade",
+//       "encode": {
+//         "labels": {
+//           "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
+//         }
+//       }
+//     }
+//   ]
+// };
+// var vlSpec4 = {
+//   "$schema": "https://vega.github.io/schema/vega/v3.json",
+//   "width": 600,
+//   "height": 300,
+//   "padding": 5,
+//   "data": [
+//     {
+//       "name": "table",
+//       "values": by,
+//       "transform": [
+//         {
+//           "type": "stack",
+//           "groupby": ["Year"],
+//           "sort": {"field": "GradeSort", "order": "descending"},
+//           "field": "Sends"
+//         }
+//       ]
+//     }
+//   ],
+//   "scales": [
+//     {
+//       "name": "x",
+//       "type": "point",
+//       "range": "width",
+//       "domain": {"data": "table", "field": "Year"}
+//     },
+//     {
+//       "name": "y",
+//       "type": "linear",
+//       "range": "height",
+//       "nice": true,
+//       "zero": true,
+//       "domain": {"data": "table", "field": "y1"}
+//     },
+//     {"name": "color", "type": "ordinal", "range": {"scheme": "category20"}},
+//     {
+//       "name": "legend_labels",
+//       "type": "ordinal",
+//       "range": {"scheme": "category20"},
+//       "domain": ["V6", "V7", "V8", "V9", "V10"]
+//     }
+//   ],
+//   "axes": [
+//     {
+//       "orient": "bottom",
+//       "scale": "x",
+//       "zindex": 0,
+//       "title": "Year",
+//       "grid": true
+//     },
+//     {
+//       "orient": "left",
+//       "scale": "y",
+//       "zindex": 0,
+//       "title": "Sends",
+//       "grid": true
+//     }
+//   ],
+//   "marks": [
+//     {
+//       "type": "group",
+//       "from": {"facet": {"name": "series", "data": "table", "groupby": "GradeSort"}},
+//       "marks": [
+//         {
+//           "type": "area",
+//           "from": {"data": "series"},
+//           "encode": {
+//             "enter": {
+//               "x": {"scale": "x", "field": "Year"},
+//               "y": {"scale": "y", "field": "y0"},
+//               "y2": {"scale": "y", "field": "y1"},
+//               "fill": {"scale": "color", "field": "GradeSort"}
+//             },
+//             "update": {
+//               "fillOpacity": {"value": 1},
+//               "fill":{"scale":"color","field":"GradeSort"}
+//               },
+//             "hover": {
+//               "fill":{"value":"black"},
+//               "fillOpacity": {"value": 0.5}
+//             }
+//           }
+//         }
+//       ]
+//     }
+//   ],
+//   "legends": [
+//     {
+//       "fill": "legend_labels",
+//       "title": "Grade",
+//       "encode": {
+//         "labels": {
+//           "update": {"fontSize": {"value": 16}, "fill": {"value": "black"}}
+//         }
+//       }
+//     }
+//   ]
+// };
 
 // var vlSpec4 = {
 //   "$schema": "https://vega.github.io/schema/vega/v3.json",
@@ -633,8 +728,10 @@ var vlSpec4 = {
   // Embed the visualization in the container with id `vis`
   // vegaEmbed("#vis1", vlSpec1);
   vegaEmbed("#vis2", vlSpec2);
-  vegaEmbed("#vis3", vlSpec3);
-  vegaEmbed("#vis4", vlSpec4);
+  // vegaEmbed("#vis3", vlSpec3);
+  vegaEmbed("#vis3", areaChart(ry, "category20b"));
+  // vegaEmbed("#vis4", vlSpec4);
+  vegaEmbed("#vis4", areaChart(by));
   </script>
 </body>
 </html>
