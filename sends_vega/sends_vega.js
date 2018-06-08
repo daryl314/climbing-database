@@ -1,29 +1,3 @@
-<!DOCTYPE html>
-<head>
-  <title>Vega Lite Bar Chart</title>
-  <meta charset="utf-8">
-
-  <script src="data.js"></script>
-  <script src="jslib/vega.3_3_1.min.js"></script>
-  <!-- <script src="https://cdn.jsdelivr.net/npm/vega-lite@2.4.3/build/vega-lite.js"></script> -->
-  <script src="jslib/vega-embed.3_9_0.min.js"></script>
-
-  <style media="screen">
-    /* Add space between Vega-Embed links  */
-    .vega-actions a {
-      margin-right: 5px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Template for Embedding Vega-Lite Visualization</h1>
-  <!-- Container for the visualization -->
-  <div id="vis2"></div>
-  <div id="vis3"></div>
-  <div id="vis4"></div>
-
-  <script>
-
 // calculate some additional fields
 var now = new Date();
 var minYear = now.getFullYear();
@@ -347,9 +321,77 @@ var vlSpec2 = {
 };
 
   // Embed the visualization in the container with id `vis`
-  vegaEmbed("#vis2", vlSpec2);
-  vegaEmbed("#vis3", areaChart(ry, "category20b"));
-  vegaEmbed("#vis4", areaChart(by));
-  </script>
-</body>
-</html>
+  let vega_options = {
+    actions: {
+      export   : true,
+      source   : false,
+      compiled : false,
+      editor   : true
+    }
+  };
+  vegaEmbed("#chartContainer", vlSpec2                     , vega_options);
+  vegaEmbed("#routeArea"     , areaChart(ry, "category20b"), vega_options);
+  vegaEmbed("#boulderArea"   , areaChart(by)               , vega_options);
+
+  ///////////////////////////////
+
+  // best sends 
+  let sortedSends = _.orderBy(data, ['GradeSort','SendDate'], ['desc','desc']);
+  let bestSends = {
+    'routeRedpoint'   : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort >= 500),
+    'routeFlash'      : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort >= 500),
+    'routeOnsight'    : sortedSends.find(x => x.Style == 'onsight'  && x.GradeSort >= 500),
+    'boulderRedpoint' : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort <  500),
+    'boulderFlash'    : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort <  500)
+  };
+  $('#best_sends').html(`
+    <li>Route Redpoint: ${bestSends.routeRedpoint.Route} (${bestSends.routeRedpoint.Grade})</li>
+    <li>Route Flash: ${bestSends.routeFlash.Route} (${bestSends.routeFlash.Grade})</li>
+    <li>Route Onsight: ${bestSends.routeOnsight.Route} (${bestSends.routeOnsight.Grade})</li>
+    <li>Boulder Redpoint: ${bestSends.boulderRedpoint.Route} (${bestSends.boulderRedpoint.Grade})</li>
+    <li>Boulder Flash: ${bestSends.boulderFlash.Route} (${bestSends.boulderFlash.Grade})</li>
+  `);
+
+  // most recent sends
+  let sendsByDate = _.orderBy(data, ['SendDate'], ['desc']);
+  $('ul#recent_sends').html(
+    sendsByDate.slice(0,5).map(x => 
+      `<li>${x.Route} (${x.Grade}) ${x.Style.slice(0,1).toUpperCase()}${x.Style.slice(1)} ${x.SendDate.toLocaleDateString()}</li>`
+    ).join('\n')
+  );
+
+  // selector
+  $('select#minBoulder').html( gradeSort.filter(x => x.startsWith('V' )).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'))
+  $('select#minRoute'  ).html( gradeSort.filter(x => x.startsWith('5.')).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'))
+  console.log($('select#minBoulder').val());
+
+  // table of sends
+  function sendTable(title, data) {
+    let tr = data.map(x => `
+      <tr class='sends'>
+        <td>${x.Grade}</td>
+        <td><span title='${x.Area}'>${x.Route}</span></td>
+        <td class='${x.Style}'>${x.SendDate.toLocaleDateString()}</td>
+      </tr>
+    `);
+    return tr.join('\n')
+  }
+  $('table#all_routes'  ).html(sendTable('Routes',           _.filter(sendsByDate, x => x.GradeSort > minRoute                       )));
+  $('table#all_boulders').html(sendTable('Boulder Problems', _.filter(sendsByDate, x => x.GradeSort > minBoulder && x.GradeSort < 500)));
+
+  // tree of sends by area
+  function objMap(o, fn) {
+    return Object.keys(o).sort().map(k => fn(k, o[k]))
+  }
+  $('ul#sendTree').html(
+    objMap(_.groupBy(data,'Area'), (area,areaData) => {
+      let areaList = objMap(_.groupBy(areaData, 'Cliff'), (cliff,cliffData) => {
+        let cliffList = _.sortBy(cliffData,'Route').map(x => `<li class='climb'>${x.Route} (${x.Grade})</li>`).join('\n');
+        return `<li class='cliff'>${cliff}<ul style='display:none'>${cliffList}</ul></li>`
+      }).join('\n');
+      return `<li class='area'>${area}<ul style='display:none'>${areaList}</ul></li>`
+    }).join('\n')
+  );
+
+  $('ul.tree li.area' ).on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
+  $('ul.tree li.cliff').on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
