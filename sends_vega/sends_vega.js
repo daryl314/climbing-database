@@ -1,3 +1,7 @@
+////////////////////////
+// PROCESS INPUT DATA //
+////////////////////////
+
 // calculate some additional fields
 var now = new Date();
 var minYear = now.getFullYear();
@@ -44,13 +48,59 @@ for (let i = 0; i < pivot.length; i++) {
   });
 };
 
-// filter stacked data
-let ry = stacked.filter(x => x.GradeSort >= 512);
-let by = stacked.filter(x => x.GradeSort >= 6 && x.GradeSort < 20);
+///////////////////////////
+// BUILD STATIC ELEMENTS //
+///////////////////////////
 
-// minimum grade to show
-let minBoulder = 6;  // V6
-let minRoute = 512;  // 5.12
+// best sends 
+let sortedSends = _.orderBy(data, ['GradeSort','SendDate'], ['desc','desc']);
+let bestSends = {
+  'routeRedpoint'   : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort >= 500),
+  'routeFlash'      : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort >= 500),
+  'routeOnsight'    : sortedSends.find(x => x.Style == 'onsight'  && x.GradeSort >= 500),
+  'boulderRedpoint' : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort <  500),
+  'boulderFlash'    : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort <  500)
+};
+$('#best_sends').html(`
+  <li>Route Redpoint: ${bestSends.routeRedpoint.Route} (${bestSends.routeRedpoint.Grade})</li>
+  <li>Route Flash: ${bestSends.routeFlash.Route} (${bestSends.routeFlash.Grade})</li>
+  <li>Route Onsight: ${bestSends.routeOnsight.Route} (${bestSends.routeOnsight.Grade})</li>
+  <li>Boulder Redpoint: ${bestSends.boulderRedpoint.Route} (${bestSends.boulderRedpoint.Grade})</li>
+  <li>Boulder Flash: ${bestSends.boulderFlash.Route} (${bestSends.boulderFlash.Grade})</li>
+`);
+
+// most recent sends
+let sendsByDate = _.orderBy(data, ['SendDate'], ['desc']);
+$('ul#recent_sends').html(
+  sendsByDate.slice(0,5).map(x => 
+    `<li>${x.Route} (${x.Grade}) ${x.Style.slice(0,1).toUpperCase()}${x.Style.slice(1)} ${x.SendDate.toLocaleDateString()}</li>`
+  ).join('\n')
+);
+
+// tree of sends by area
+function objMap(o, fn) {
+  return Object.keys(o).sort().map(k => fn(k, o[k]))
+}
+$('ul#sendTree').html(
+  objMap(_.groupBy(data,'Area'), (area,areaData) => {
+    let areaList = objMap(_.groupBy(areaData, 'Cliff'), (cliff,cliffData) => {
+      let cliffList = _.sortBy(cliffData,'Route').map(x => `<li class='climb'>${x.Route} (${x.Grade})</li>`).join('\n');
+      return `<li class='cliff'>${cliff}<ul style='display:none'>${cliffList}</ul></li>`
+    }).join('\n');
+    return `<li class='area'>${area}<ul style='display:none'>${areaList}</ul></li>`
+  }).join('\n')
+);
+
+$('ul.tree li.area' ).on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
+$('ul.tree li.cliff').on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
+
+// selector
+$('select#minBoulder').html( gradeSort.filter(x => x.startsWith('V' )).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'));
+$('select#minRoute'  ).html( gradeSort.filter(x => x.startsWith('5.')).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'));
+
+////////////////////
+// VEGA FUNCTIONS //
+////////////////////
 
 function areaChart(data, colorMap="category20") {
   return {
@@ -171,156 +221,168 @@ function areaChart(data, colorMap="category20") {
   }
 }
 
-var vlSpec2 = {
+function barChart(data, minBoulder, minRoute) {
+  return {
 
-  // vega 3 chart...
-  "$schema": "https://vega.github.io/schema/vega/v3.0.json",
-  "padding": 5,
-  "width": 500,
-  "height": 300,
-  "description": "Climbing sends bar chart",
-  "title": "Distribution of sends",
-
-  // define data
-  "data": [
-
-    {  // attach data to source_0 data sourc
-      "name": "source_0",
-      "values": data
-    },
-    
-    { // compute data_0 based on source_0...
-      "name": "data_0",
-      "source": "source_0",
-      "transform": [
-
-        { // bucket by year clipped at 5 years
-          "type": "formula",
-          "expr": "datum.Years > 4 ? 5 : datum.Years",
-          "as": "YearBucket"
-        },
-
-        { // filter out data below minimum grade
-          "type": "filter", 
-          "expr": `inrange(datum["GradeSort"], [${minBoulder}, 15]) || inrange(datum["GradeSort"], [${minRoute},515])`
-        },
-        
-        { // agggregate data by YearBucket
-          "type": "aggregate",
-          "groupby": ["Grade", "YearBucket"],
-          "ops": ["count"],
-          "fields": ["*"],
-          "as": ["count_*"]
-        },
-        
-        { // create a stacking series based on aggregation
-          "type": "stack",
-          "groupby": ["Grade"],
-          "field": "count_*",
-          "sort": {"field": ["YearBucket"], "order": ["ascending"]},
-          "as": ["count_*_start", "count_*_end"],
-          "offset": "zero"
-        }
-      ]
-    }
-  ],
-
-  // define bar data
-  "marks": [{
-    "name": "marks",
-    "type": "rect",
-    "style": ["bar"],
-    "from": {"data": "data_0"},
-    "encode": {
-      "update": {
-        "fill": {"scale": "color", "field": "YearBucket"},
-        "tooltip": {"signal": "''+datum[\"Grade\"]"},
-        "x": {"scale": "x", "field": "Grade"},
-        "width": {"scale": "x", "band": true},
-        "y": {"scale": "y", "field": "count_*_end"},
-        "y2": {"scale": "y", "field": "count_*_start"}
+    // vega 3 chart...
+    "$schema": "https://vega.github.io/schema/vega/v3.0.json",
+    "padding": 5,
+    "width": 500,
+    "height": 300,
+    "description": "Climbing sends bar chart",
+    "title": "Distribution of sends",
+  
+    // define data
+    "data": [
+  
+      {  // attach data to source_0 data sourc
+        "name": "source_0",
+        "values": data
+      },
+      
+      { // compute data_0 based on source_0...
+        "name": "data_0",
+        "source": "source_0",
+        "transform": [
+  
+          { // bucket by year clipped at 5 years
+            "type": "formula",
+            "expr": "datum.Years > 4 ? 5 : datum.Years",
+            "as": "YearBucket"
+          },
+  
+          { // filter out data below minimum grade
+            "type": "filter", 
+            "expr": `inrange(datum["GradeSort"], [${minBoulder}, 15]) || inrange(datum["GradeSort"], [${minRoute},515])`
+          },
+          
+          { // agggregate data by YearBucket
+            "type": "aggregate",
+            "groupby": ["Grade", "YearBucket"],
+            "ops": ["count"],
+            "fields": ["*"],
+            "as": ["count_*"]
+          },
+          
+          { // create a stacking series based on aggregation
+            "type": "stack",
+            "groupby": ["Grade"],
+            "field": "count_*",
+            "sort": {"field": ["YearBucket"], "order": ["ascending"]},
+            "as": ["count_*_start", "count_*_end"],
+            "offset": "zero"
+          }
+        ]
       }
-    }
-  }],
-
-  // define mappings from data values to visual values (pixels, colors, sizes)
-  "scales": [{
-      "name": "x",
-      "type": "band",
-      "domain": {"data": "data_0", "field": "Grade"},
-      "range": [0, {"signal": "width"}],
-      "paddingInner": 0.1,
-      "paddingOuter": 0.05
-    },{
-      "name": "y",
-      "type": "linear",
-      "domain": {"data": "data_0", "fields": ["count_*_start", "count_*_end"]},
-      "range": [{"signal": "height"}, 0],
-      "nice": true,
-      "zero": true
-    },{ // color map for data
-      "name": "color",
-      "type": "ordinal",
-      "domain": [0,1,2,3,4,5],
-      "range": {"scheme": "yelloworangebrown-6"},
-      "reverse": true
-    },{ // custom legend labels matching data color map
-      "name": "legend_labels",
-      "type": "ordinal",
-      "range": {"scheme": "yelloworangebrown-6"},
-      "domain": ["0 Years","1 Year","2 Years","3 Years","4 Years","5+ Years"],
-      "reverse": true
-    }
-  ],
-
-  // define axes
-  "axes": [{
-    "scale": "x",
-    "orient": "bottom",
-    "title": "Grade",
-    "labelOverlap": true,
-    "encode": {
-      "labels": {
+    ],
+  
+    // define bar data
+    "marks": [{
+      "name": "marks",
+      "type": "rect",
+      "style": ["bar"],
+      "from": {"data": "data_0"},
+      "encode": {
         "update": {
-          "angle": {"value": 270},
-          "align": {"value": "right"},
-          "baseline": {"value": "middle"}
+          "fill": {"scale": "color", "field": "YearBucket"},
+          "tooltip": {"signal": "''+datum[\"Grade\"]"},
+          "x": {"scale": "x", "field": "Grade"},
+          "width": {"scale": "x", "band": true},
+          "y": {"scale": "y", "field": "count_*_end"},
+          "y2": {"scale": "y", "field": "count_*_start"}
         }
       }
-    },
-    "zindex": 1
-  },{
-    "scale": "y",
-    "orient": "left",
-    "title": "Number of Sends",
-    "labelOverlap": true,
-    "tickCount": {"signal": "ceil(height/40)"},
-    "zindex": 1
-  },{
-    "scale": "y",
-    "orient": "left",
-    "grid": true,
-    "tickCount": {"signal": "ceil(height/40)"},
-    "gridScale": "x",
-    "domain": false,
-    "labels": false,
-    "maxExtent": 0,
-    "minExtent": 0,
-    "ticks": false,
-    "zindex": 0
-  }],
+    }],
+  
+    // define mappings from data values to visual values (pixels, colors, sizes)
+    "scales": [{
+        "name": "x",
+        "type": "band",
+        "domain": {"data": "data_0", "field": "Grade"},
+        "range": [0, {"signal": "width"}],
+        "paddingInner": 0.1,
+        "paddingOuter": 0.05
+      },{
+        "name": "y",
+        "type": "linear",
+        "domain": {"data": "data_0", "fields": ["count_*_start", "count_*_end"]},
+        "range": [{"signal": "height"}, 0],
+        "nice": true,
+        "zero": true
+      },{ // color map for data
+        "name": "color",
+        "type": "ordinal",
+        "domain": [0,1,2,3,4,5],
+        "range": {"scheme": "yelloworangebrown-6"},
+        "reverse": true
+      },{ // custom legend labels matching data color map
+        "name": "legend_labels",
+        "type": "ordinal",
+        "range": {"scheme": "yelloworangebrown-6"},
+        "domain": ["0 Years","1 Year","2 Years","3 Years","4 Years","5+ Years"],
+        "reverse": true
+      }
+    ],
+  
+    // define axes
+    "axes": [{
+      "scale": "x",
+      "orient": "bottom",
+      "title": "Grade",
+      "labelOverlap": true,
+      "encode": {
+        "labels": {
+          "update": {
+            "angle": {"value": 270},
+            "align": {"value": "right"},
+            "baseline": {"value": "middle"}
+          }
+        }
+      },
+      "zindex": 1
+    },{
+      "scale": "y",
+      "orient": "left",
+      "title": "Number of Sends",
+      "labelOverlap": true,
+      "tickCount": {"signal": "ceil(height/40)"},
+      "zindex": 1
+    },{
+      "scale": "y",
+      "orient": "left",
+      "grid": true,
+      "tickCount": {"signal": "ceil(height/40)"},
+      "gridScale": "x",
+      "domain": false,
+      "labels": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    }],
+  
+    // define legend using custom labels
+    "legends": [{
+      "fill": "legend_labels",
+      "encode": {"symbols": {"update": {"shape": {"value": "square"}}}}
+    }],
+  
+    // min y axis range
+    "config": {"axisY": {"minExtent": 30}}
+  };
+}
 
-  // define legend using custom labels
-  "legends": [{
-    "fill": "legend_labels",
-    "encode": {"symbols": {"update": {"shape": {"value": "square"}}}}
-  }],
+/////////////////////
+// UPDATE FUNCTION //
+/////////////////////
 
-  // min y axis range
-  "config": {"axisY": {"minExtent": 30}}
-};
+function update(minBoulder, minRoute) {
 
-  // Embed the visualization in the container with id `vis`
+  // filter stacked data
+  let ry = stacked.filter(x => x.GradeSort >= minRoute);
+  let by = stacked.filter(x => x.GradeSort >= minBoulder && x.GradeSort < 20);
+
+  // embed visualization
   let vega_options = {
     actions: {
       export   : true,
@@ -329,41 +391,9 @@ var vlSpec2 = {
       editor   : true
     }
   };
-  vegaEmbed("#chartContainer", vlSpec2                     , vega_options);
-  vegaEmbed("#routeArea"     , areaChart(ry, "category20b"), vega_options);
-  vegaEmbed("#boulderArea"   , areaChart(by)               , vega_options);
-
-  ///////////////////////////////
-
-  // best sends 
-  let sortedSends = _.orderBy(data, ['GradeSort','SendDate'], ['desc','desc']);
-  let bestSends = {
-    'routeRedpoint'   : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort >= 500),
-    'routeFlash'      : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort >= 500),
-    'routeOnsight'    : sortedSends.find(x => x.Style == 'onsight'  && x.GradeSort >= 500),
-    'boulderRedpoint' : sortedSends.find(x => x.Style == 'redpoint' && x.GradeSort <  500),
-    'boulderFlash'    : sortedSends.find(x => x.Style == 'flash'    && x.GradeSort <  500)
-  };
-  $('#best_sends').html(`
-    <li>Route Redpoint: ${bestSends.routeRedpoint.Route} (${bestSends.routeRedpoint.Grade})</li>
-    <li>Route Flash: ${bestSends.routeFlash.Route} (${bestSends.routeFlash.Grade})</li>
-    <li>Route Onsight: ${bestSends.routeOnsight.Route} (${bestSends.routeOnsight.Grade})</li>
-    <li>Boulder Redpoint: ${bestSends.boulderRedpoint.Route} (${bestSends.boulderRedpoint.Grade})</li>
-    <li>Boulder Flash: ${bestSends.boulderFlash.Route} (${bestSends.boulderFlash.Grade})</li>
-  `);
-
-  // most recent sends
-  let sendsByDate = _.orderBy(data, ['SendDate'], ['desc']);
-  $('ul#recent_sends').html(
-    sendsByDate.slice(0,5).map(x => 
-      `<li>${x.Route} (${x.Grade}) ${x.Style.slice(0,1).toUpperCase()}${x.Style.slice(1)} ${x.SendDate.toLocaleDateString()}</li>`
-    ).join('\n')
-  );
-
-  // selector
-  $('select#minBoulder').html( gradeSort.filter(x => x.startsWith('V' )).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'))
-  $('select#minRoute'  ).html( gradeSort.filter(x => x.startsWith('5.')).map(x => `<option value=${foundGrades[x]}>${x}</option>`).join('\n'))
-  console.log($('select#minBoulder').val());
+  vegaEmbed("#chartContainer", barChart(data,minBoulder,minRoute) , vega_options);
+  vegaEmbed("#routeArea"     , areaChart(ry, "category20b")       , vega_options);
+  vegaEmbed("#boulderArea"   , areaChart(by)                      , vega_options);
 
   // table of sends
   function sendTable(title, data) {
@@ -376,22 +406,26 @@ var vlSpec2 = {
     `);
     return tr.join('\n')
   }
-  $('table#all_routes'  ).html(sendTable('Routes',           _.filter(sendsByDate, x => x.GradeSort > minRoute                       )));
-  $('table#all_boulders').html(sendTable('Boulder Problems', _.filter(sendsByDate, x => x.GradeSort > minBoulder && x.GradeSort < 500)));
+  $('table#all_routes'  ).html(sendTable('Routes',           _.filter(sendsByDate, x => x.GradeSort >= minRoute                       )));
+  $('table#all_boulders').html(sendTable('Boulder Problems', _.filter(sendsByDate, x => x.GradeSort >= minBoulder && x.GradeSort < 500)));
+}
 
-  // tree of sends by area
-  function objMap(o, fn) {
-    return Object.keys(o).sort().map(k => fn(k, o[k]))
-  }
-  $('ul#sendTree').html(
-    objMap(_.groupBy(data,'Area'), (area,areaData) => {
-      let areaList = objMap(_.groupBy(areaData, 'Cliff'), (cliff,cliffData) => {
-        let cliffList = _.sortBy(cliffData,'Route').map(x => `<li class='climb'>${x.Route} (${x.Grade})</li>`).join('\n');
-        return `<li class='cliff'>${cliff}<ul style='display:none'>${cliffList}</ul></li>`
-      }).join('\n');
-      return `<li class='area'>${area}<ul style='display:none'>${areaList}</ul></li>`
-    }).join('\n')
-  );
+//////////////////////////////
+// SET EVERYTHING IN MOTION //
+//////////////////////////////
 
-  $('ul.tree li.area' ).on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
-  $('ul.tree li.cliff').on('click', function(event){$(this).children().toggle(); event.stopPropagation()});
+// minimum grade to show
+let minBoulder = 6;      // V6
+let minRoute   = 512.1;  // 5.12a
+$('select#minBoulder').val(minBoulder);
+$('select#minRoute').val(minRoute);
+
+// initial state
+function triggerUpdate() {
+  update( $('select#minBoulder').val(), $('select#minRoute').val() )
+}
+triggerUpdate();
+
+// trigger updates on changes
+$('select#minRoute').on('change', triggerUpdate);
+$('select#minBoulder').on('change', triggerUpdate);
