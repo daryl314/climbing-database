@@ -2,6 +2,9 @@
 // PROCESS INPUT DATA //
 ////////////////////////
 
+// sort data by grade
+data = _.sortBy(data, 'GradeSort');
+
 // calculate some additional fields
 var now = new Date();
 var minYear = now.getFullYear();

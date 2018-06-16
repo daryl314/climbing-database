@@ -1,32 +1,7 @@
 #!/bin/bash
 
-# confirm that server is running
-curl --silent localhost:3000 > /dev/null || echo "Local server not running!"
-curl --silent localhost:3000 > /dev/null || exit
-echo "Local server found.  Updating data on remote server"
-
-# generate a temporary directory to contain processed output
-mkdir -p tmp
-
 # generate send data javascript file
-echo "data="`curl --silent localhost:3000/Sends` > tmp/send_data.js
+python sqlite3_server.py --dump-table=SENDS --dump-variable=data climbing.db > sends_vega/data.js
 
-# generate page javascript file
-curl --silent localhost:3000/sends.js > tmp/sends.js
-
-# generate index.html including send data
-sed 's/<script type="text\/javascript" src="sends.js">/<script type="text\/javascript" src="send-data.js"><\/script>\n    <script type="text\/javascript" src="sends.js">/' \
-  < public/sends.html \
-  > tmp/sends.html 
-
-# copy data to remote server
-scp -q public/sends_static.html root@darylstlaurent.com:/var/www/public_root/climbing/sends.html
-scp -q public/sends.css         root@darylstlaurent.com:/var/www/public_root/climbing/
-scp -q public/node.png          root@darylstlaurent.com:/var/www/public_root/climbing/
-scp -q public/vline.png         root@darylstlaurent.com:/var/www/public_root/climbing/
-scp -q public/lastnode.png      root@darylstlaurent.com:/var/www/public_root/climbing/
-scp -q tmp/send_data.js         root@darylstlaurent.com:/var/www/public_root/climbing/
-scp -q tmp/sends.js             root@darylstlaurent.com:/var/www/public_root/climbing/
-
-# cleanup
-rm -rf tmp
+# send data to server
+rsync -az --delete sends_vega root@darylstlaurent.com:/root/docker-server/static/
