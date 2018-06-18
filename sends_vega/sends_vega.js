@@ -11,7 +11,8 @@ var minYear = now.getFullYear();
 var foundGrades = {};
 var gradeSort = [];
 data.forEach(x => {
-  x.SendDate = new Date(x.SendDate);
+  let dateBits = x.SendDate.split('-').map(x => parseInt(x));
+  x.SendDate = new Date(dateBits[0], dateBits[1]-1, dateBits[2]);
   x.Year = x.SendDate.getFullYear();
   x.Years = Math.floor((now - x.SendDate) / 1000 / 60 / 60 / 24 / 365.25);
   x.Grade = x.Grade.slice(0,5);
