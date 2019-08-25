@@ -2,20 +2,30 @@
 
 # databases to compare
 RIGHT=${1:-'climbing.db'}
-LEFT=${2:-`dir backups/*.db -1t | head -n 1`}
+LEFT=${2:-$(ls -t backups/*.db | head -1)}
 echo ""
-echo "Comparing $LEFT -> $RIGHT"
+echo "Comparing $(tput setaf 4)${LEFT}$(tput sgr0) -> $(tput setaf 4)${RIGHT}$(tput sgr0)"
 echo ""
 
 # compare routes
 echo ""
-echo "Comparing Routes"
+echo "$(tput bold)Comparing Routes$(tput sgr0)"
 echo ""
-colordiff <(sqlite3 $LEFT "SELECT * FROM Routes" ) <(sqlite3 $RIGHT "SELECT * FROM Routes")
+diff <(sqlite3 $LEFT "SELECT * FROM Routes" ) \
+     <(sqlite3 $RIGHT "SELECT * FROM Routes") \
+     | sed "s/^[<\\-] .*/$(tput setaf 1)&$(tput sgr0)/" \
+     | sed "s/^[>\\+] .*/$(tput setaf 2)&$(tput sgr0)/" \
+     | sed "s/^[0-9a-f]\{1,\},[0-9a-f]\{1,\}$/$(tput setaf 6)&$(tput sgr0)/" \
+     | sed "s/^[0-9a-f]\{1,\}$/$(tput setaf 6)&$(tput sgr0)/"
 
 # compare sends
 echo ""
-echo "Comparing Sends"
+echo "$(tput bold)Comparing Sends$(tput sgr0)"
 echo ""
-colordiff <(sqlite3 $LEFT "SELECT * FROM Sends"  ) <(sqlite3 $RIGHT "SELECT * FROM Sends" )
+diff <(sqlite3 $LEFT "SELECT * FROM Sends"  ) \
+     <(sqlite3 $RIGHT "SELECT * FROM Sends" ) \
+     | sed "s/^[<\\-] .*/$(tput setaf 1)&$(tput sgr0)/" \
+     | sed "s/^[>\\+] .*/$(tput setaf 2)&$(tput sgr0)/" \
+     | sed "s/^[0-9a-f]\{1,\},[0-9a-f]\{1,\}$/$(tput setaf 6)&$(tput sgr0)/" \
+     | sed "s/^[0-9a-f]\{1,\}$/$(tput setaf 6)&$(tput sgr0)/"
 echo ""
