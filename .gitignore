@@ -9,3 +9,6 @@ OldCode
 
 # ignore tilde files
 *~
+
+# ignore python cache
+__pycache__
