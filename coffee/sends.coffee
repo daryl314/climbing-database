@@ -321,7 +321,7 @@ jQuery ->
     doRefresh()
     buildTree()
   else # fetch data with ajax
-    $.ajax( url:'/Sends' ).done((x) ->
+    $.ajax( url:'/tables/Sends' ).done((x) ->
       root.data = x
       processData()
       setup()

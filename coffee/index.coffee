@@ -62,7 +62,7 @@ convertTable = (x, tbl, id) ->
     idAttribute: id
 
     # url for model on server
-    url: "/#{tbl}"
+    url: "/tables/#{tbl}"
 
     # function to return the row where the value in column 'a' equals 'b'
     lookup: (a,b) -> @findWhere _.object([a],[b])
@@ -673,9 +673,9 @@ jQuery ->
 
   # load table data
   window.tables = {}
-  $.ajax url:'/tableData', dataType:'json', async:false, success:(x)->
+  $.ajax url:'/tables', dataType:'json', async:false, success:(x)->
     for a in x
-      $.ajax url:"/#{a.name}", dataType:'json', async:false, success:(y)->
+      $.ajax url:"/tables/#{a.name}", dataType:'json', async:false, success:(y)->
         window.tables[ a.name ] = convertTable(y, a.name, a.id)
 
   # query objects
