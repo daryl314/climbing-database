@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import sys
 import os
 import argparse
+import json
 from flask import Flask, request, render_template, abort, jsonify, make_response
 from DatabaseEngine import DatabaseEngine
 
@@ -136,7 +138,16 @@ if __name__ == '__main__':
     parser.add_argument('--static-url-path', help='URL for serving static content')
     parser.add_argument('--static-folder', default=STATIC_DEFAULT, help='Folder containing static content')
     parser.add_argument('--import-name', default=__name__, help='Name of application package')
+    parser.add_argument('--dump-table', help='Dump specified table instead of running server')
     args = parser.parse_args()
-    DatabaseServer(args.import_name, 'sqlite:///{}'.format(args.database), verbose=not args.quiet,
-                   debug=not args.nodebug, host=args.host, port=args.port,
-                   static_url_path=args.static_url_path, static_folder=args.static_folder)
+    if args.dump_table is not None:
+        engine = DatabaseEngine('sqlite:///{}'.format(args.database), verbose=False)
+        result = engine.get(args.dump_table)
+        if result.ok:
+            print(json.dumps(result.result))
+        else:
+            sys.stderr.write("Query fail: {}\n".format(result))
+    else:
+        DatabaseServer(args.import_name, 'sqlite:///{}'.format(args.database), verbose=not args.quiet,
+                       debug=not args.nodebug, host=args.host, port=args.port,
+                       static_url_path=args.static_url_path, static_folder=args.static_folder)

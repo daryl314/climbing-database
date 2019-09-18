@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # generate send data javascript file
-python sqlite3_server.py --dump-table=SENDS --dump-variable=data climbing.db > sends_vega/data.js
+echo "data=$(./python/AutoREST.py climbing.db --dump-table=Sends)" > sends_vega/data.js
 
 # send data to server
 rsync -az --delete sends_vega root@darylstlaurent.com:/root/docker-server/static/
